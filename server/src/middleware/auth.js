@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { getDb } = require('../config/firebase');
+const { getDb, admin } = require('../config/firebase');
 const { inMemoryStore } = require('../utils/store');
 
 async function authenticateToken(req, res, next) {
@@ -76,7 +76,7 @@ async function authenticateApiKey(req, res, next) {
         .collection('users')
         .doc(user.id)
         .update({
-          apiUsageCount: (user.apiUsageCount || 0) + 1,
+          apiUsageCount: admin.firestore.FieldValue.increment(1),
           lastApiUsage: new Date().toISOString(),
         });
     } else {

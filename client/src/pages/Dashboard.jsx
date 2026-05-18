@@ -189,7 +189,7 @@ export default function Dashboard() {
                   <div
                     className="storage-bar"
                     style={{
-                      width: `${(parseInt(storage.usage) / parseInt(storage.limit)) * 100}%`,
+                      width: `${storage.limit ? (parseInt(storage.usage) / parseInt(storage.limit)) * 100 : 0}%`,
                     }}
                   />
                 </div>
