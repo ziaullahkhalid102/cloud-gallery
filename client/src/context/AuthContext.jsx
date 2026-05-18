@@ -31,6 +31,7 @@ export function AuthProvider({ children }) {
 
   function login(newToken) {
     localStorage.setItem('cg_token', newToken);
+    setLoading(true);
     setToken(newToken);
   }
 

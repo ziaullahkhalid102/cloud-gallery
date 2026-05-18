@@ -2,7 +2,7 @@ export function formatFileSize(bytes) {
   if (!bytes || bytes === '0') return '0 B';
   const num = typeof bytes === 'string' ? parseInt(bytes) : bytes;
   const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(num) / Math.log(k));
   return parseFloat((num / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }

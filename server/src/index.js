@@ -49,7 +49,7 @@ app.get('*', (req, res, next) => {
 app.use((err, req, res, _next) => {
   console.error('Server error:', err);
 
-  if (err.type === 'entity.too.large') {
+  if (err.type === 'entity.too.large' || err.code === 'LIMIT_FILE_SIZE') {
     return res.status(413).json({ error: 'File too large' });
   }
 
