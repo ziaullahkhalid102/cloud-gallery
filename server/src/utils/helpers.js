@@ -1,7 +1,19 @@
 const crypto = require('crypto');
 
 function generateApiKey() {
-  return `cg_${crypto.randomBytes(32).toString('hex')}`;
+  const prefix = 'cg_live';
+  const seg1 = crypto.randomBytes(4).toString('hex');
+  const seg2 = crypto.randomBytes(16).toString('base64url');
+  const seg3 = crypto.randomBytes(12).toString('base64url');
+  const seg4 = crypto.randomBytes(8).toString('base64url');
+  return `${prefix}_${seg1}_${seg2}${seg3}${seg4}`;
+}
+
+function generateEmbedToken() {
+  const prefix = 'cg_embed';
+  const seg1 = crypto.randomBytes(4).toString('hex');
+  const seg2 = crypto.randomBytes(20).toString('base64url');
+  return `${prefix}_${seg1}_${seg2}`;
 }
 
 function generateUserId() {
@@ -20,4 +32,4 @@ function sanitizeFileName(name) {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
-module.exports = { generateApiKey, generateUserId, formatFileSize, sanitizeFileName };
+module.exports = { generateApiKey, generateEmbedToken, generateUserId, formatFileSize, sanitizeFileName };
