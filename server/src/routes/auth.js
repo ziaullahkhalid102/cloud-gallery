@@ -131,7 +131,7 @@ router.get('/google/callback', async (req, res) => {
 
 // GET /api/auth/me - Get current user
 router.get('/me', authenticateToken, (req, res) => {
-  const { accessToken, refreshToken, tokenExpiry, apiKey, apiKeyCreatedAt, apiUsageCount, lastApiUsage, ...safeUser } = req.user;
+  const { accessToken, refreshToken, tokenExpiry, apiKey, apiKeyCreatedAt, apiUsageCount, lastApiUsage, embedToken, embedTokenCreatedAt, ...safeUser } = req.user;
   res.json({ user: safeUser });
 });
 
