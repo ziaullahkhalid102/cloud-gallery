@@ -30,18 +30,24 @@ app.use(generalLimiter);
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/drive', require('./routes/drive'));
 app.use('/api/keys', require('./routes/apiKeys'));
-app.use('/api/external', require('./routes/external'));
+app.use('/api/external', cors({ origin: '*' }), require('./routes/external'));
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Serve SDK file with CORS enabled for all origins
+app.get('/sdk/cloudgallery.js', cors({ origin: '*' }), (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.sendFile(path.join(__dirname, 'sdk', 'cloudgallery.js'));
+});
+
 // Serve frontend static files in production
 const clientDistPath = path.join(__dirname, '../../client/dist');
 app.use(express.static(clientDistPath));
 app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api')) return next();
+  if (req.path.startsWith('/api') || req.path.startsWith('/sdk')) return next();
   res.sendFile(path.join(clientDistPath, 'index.html'));
 });
 

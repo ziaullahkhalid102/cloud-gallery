@@ -35,38 +35,41 @@ async function authenticateToken(req, res, next) {
 }
 
 async function authenticateApiKey(req, res, next) {
-  const apiKey = req.headers['x-api-key'];
+  const apiKey = req.headers['x-api-key'] || req.headers['x-embed-token'];
 
   if (!apiKey) {
-    return res.status(401).json({ error: 'API key required' });
+    return res.status(401).json({ error: 'API key or embed token required' });
   }
 
   try {
     const db = getDb();
     let user;
 
+    const isEmbed = apiKey.startsWith('cg_embed_');
+
     if (db) {
+      const field = isEmbed ? 'embedToken' : 'apiKey';
       const snapshot = await db
         .collection('users')
-        .where('apiKey', '==', apiKey)
+        .where(field, '==', apiKey)
         .limit(1)
         .get();
 
       if (snapshot.empty) {
-        return res.status(401).json({ error: 'Invalid API key' });
+        return res.status(401).json({ error: isEmbed ? 'Invalid embed token' : 'Invalid API key' });
       }
 
       const doc = snapshot.docs[0];
       user = { id: doc.id, ...doc.data() };
     } else {
       for (const [id, u] of inMemoryStore.users) {
-        if (u.apiKey === apiKey) {
+        if (isEmbed ? u.embedToken === apiKey : u.apiKey === apiKey) {
           user = { id, ...u };
           break;
         }
       }
       if (!user) {
-        return res.status(401).json({ error: 'Invalid API key' });
+        return res.status(401).json({ error: isEmbed ? 'Invalid embed token' : 'Invalid API key' });
       }
     }
 
