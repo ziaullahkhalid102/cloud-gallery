@@ -14,6 +14,55 @@ function getClipsDb() {
   return { type: 'memory' };
 }
 
+// GET /api/profiles/me — Get own profile
+router.get('/me', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const store = getClipsDb();
+    let user;
+
+    if (store.type === 'firestore') {
+      const userDoc = await store.db.collection('users').doc(userId).get();
+      if (!userDoc.exists) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      const data = userDoc.data();
+      user = {
+        id: userDoc.id,
+        name: data.name,
+        email: data.email,
+        picture: data.picture,
+        username: data.username || null,
+        bio: data.bio || null,
+        followersCount: data.followersCount || 0,
+        followingCount: data.followingCount || 0,
+        videosCount: data.videosCount || 0,
+        totalLikes: data.totalLikes || 0,
+      };
+    } else {
+      const stored = inMemoryStore.users.get(userId);
+      if (!stored) return res.status(404).json({ error: 'User not found' });
+      user = {
+        id: userId,
+        name: stored.name,
+        email: stored.email,
+        picture: stored.picture,
+        username: stored.username || null,
+        bio: stored.bio || null,
+        followersCount: stored.followersCount || 0,
+        followingCount: stored.followingCount || 0,
+        videosCount: stored.videosCount || 0,
+        totalLikes: stored.totalLikes || 0,
+      };
+    }
+
+    res.json({ user });
+  } catch (error) {
+    console.error('Get own profile error:', error);
+    res.status(500).json({ error: 'Failed to load profile' });
+  }
+});
+
 // GET /api/profiles/:userId — Get user profile
 router.get('/:userId', async (req, res) => {
   try {
@@ -157,6 +206,23 @@ router.post('/:userId/follow', authenticateToken, async (req, res) => {
           followingCount: admin.firestore.FieldValue.increment(1),
         });
         res.json({ following: true });
+
+        // Create follow notification
+        try {
+          const currentUserDoc = await store.db.collection('users').doc(currentUserId).get();
+          const currentUserData = currentUserDoc.data();
+          await store.db.collection('clipNotifications').add({
+            toUserId: targetUserId,
+            type: 'follow',
+            fromUserId: currentUserId,
+            fromUserName: currentUserData?.name || 'Someone',
+            fromUserPicture: currentUserData?.picture || null,
+            isRead: false,
+            createdAt: new Date().toISOString(),
+          });
+        } catch (notifErr) {
+          console.error('Follow notification error:', notifErr);
+        }
       }
     } else {
       const isFollowing = inMemoryStore.clipFollowers.has(followKey);
