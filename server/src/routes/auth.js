@@ -13,15 +13,29 @@ const router = express.Router();
 // GET /api/auth/google - Redirect to Google OAuth
 router.get('/google', authLimiter, (req, res) => {
   const oauth2Client = createOAuth2Client();
-  const url = getAuthUrl(oauth2Client);
+  const platform = req.query.platform || 'web';
+  const url = oauth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: [
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/userinfo.profile',
+      'https://www.googleapis.com/auth/drive.file',
+    ],
+    prompt: 'consent',
+    state: platform,
+  });
   res.json({ url });
 });
 
 // GET /api/auth/google/callback - Handle OAuth callback
 router.get('/google/callback', async (req, res) => {
-  const { code } = req.query;
+  const { code, state } = req.query;
+  const platform = state || 'web';
 
   if (!code) {
+    if (platform === 'mobile') {
+      return res.json({ error: 'no_code' });
+    }
     return res.redirect(`${process.env.CLIENT_URL}/login?error=no_code`);
   }
 
@@ -120,11 +134,17 @@ router.get('/google/callback', async (req, res) => {
 
     const jwtToken = jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
+    if (platform === 'mobile') {
+      return res.send(`<!DOCTYPE html><html><head><title>ClipZone Login</title></head><body><script>window.location.href="clipzone://auth?token=${jwtToken}&new=${isNewUser}";</script><p>Login successful! Returning to ClipZone...</p></body></html>`);
+    }
     res.redirect(
       `${process.env.CLIENT_URL}/auth/callback?token=${jwtToken}&new=${isNewUser}`
     );
   } catch (error) {
     console.error('OAuth callback error:', error);
+    if (platform === 'mobile') {
+      return res.send('<!DOCTYPE html><html><head><title>Login Failed</title></head><body><script>window.location.href="clipzone://auth?error=auth_failed";</script><p>Login failed. Please try again.</p></body></html>');
+    }
     res.redirect(`${process.env.CLIENT_URL}/login?error=auth_failed`);
   }
 });
