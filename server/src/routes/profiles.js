@@ -63,6 +63,60 @@ router.get('/:userId', async (req, res) => {
   }
 });
 
+// PUT /api/profiles/me — Update own profile
+router.put('/me', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { name, username, bio } = req.body;
+    const store = getClipsDb();
+    const updates = {};
+
+    if (name !== undefined) updates.name = name;
+    if (username !== undefined) updates.username = username;
+    if (bio !== undefined) updates.bio = bio;
+    updates.updatedAt = new Date().toISOString();
+
+    if (store.type === 'firestore') {
+      await store.db.collection('users').doc(userId).update(updates);
+      const updatedDoc = await store.db.collection('users').doc(userId).get();
+      const data = updatedDoc.data();
+      res.json({
+        user: {
+          id: userId,
+          name: data.name,
+          email: data.email,
+          picture: data.picture,
+          username: data.username || null,
+          bio: data.bio || null,
+          followersCount: data.followersCount || 0,
+          followingCount: data.followingCount || 0,
+          videosCount: data.videosCount || 0,
+        },
+      });
+    } else {
+      const user = inMemoryStore.users.get(userId);
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      Object.assign(user, updates);
+      res.json({
+        user: {
+          id: userId,
+          name: user.name,
+          email: user.email,
+          picture: user.picture,
+          username: user.username || null,
+          bio: user.bio || null,
+          followersCount: user.followersCount || 0,
+          followingCount: user.followingCount || 0,
+          videosCount: user.videosCount || 0,
+        },
+      });
+    }
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
 // POST /api/profiles/:userId/follow — Toggle follow
 router.post('/:userId/follow', authenticateToken, async (req, res) => {
   try {

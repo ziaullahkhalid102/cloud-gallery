@@ -34,6 +34,7 @@ app.use('/api/external', cors({ origin: '*' }), require('./routes/external'));
 app.use('/api/clips', cors({ origin: '*' }), require('./routes/clips'));
 app.use('/api/profiles', cors({ origin: '*' }), require('./routes/profiles'));
 app.use('/api/search', cors({ origin: '*' }), require('./routes/search'));
+app.use('/api/notifications', cors({ origin: '*' }), require('./routes/notifications'));
 
 // Health check
 app.get('/api/health', (req, res) => {
