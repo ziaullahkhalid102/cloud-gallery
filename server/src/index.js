@@ -31,6 +31,9 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/drive', require('./routes/drive'));
 app.use('/api/keys', require('./routes/apiKeys'));
 app.use('/api/external', cors({ origin: '*' }), require('./routes/external'));
+app.use('/api/clips', cors({ origin: '*' }), require('./routes/clips'));
+app.use('/api/profiles', cors({ origin: '*' }), require('./routes/profiles'));
+app.use('/api/search', cors({ origin: '*' }), require('./routes/search'));
 
 // Health check
 app.get('/api/health', (req, res) => {
