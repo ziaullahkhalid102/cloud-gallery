@@ -217,6 +217,27 @@ router.post('/:id/like', authenticateToken, async (req, res) => {
           likesCount: require('firebase-admin').firestore.FieldValue.increment(1),
         });
         res.json({ liked: true });
+
+        // Create like notification
+        try {
+          const clipDoc = await store.db.collection('clips').doc(clipId).get();
+          const clipData = clipDoc.data();
+          if (clipData && clipData.userId !== userId) {
+            await store.db.collection('clipNotifications').add({
+              toUserId: clipData.userId,
+              type: 'like',
+              fromUserId: userId,
+              fromUserName: req.user.name || req.user.email,
+              fromUserPicture: req.user.picture || null,
+              videoId: clipId,
+              videoCaption: clipData.caption || '',
+              isRead: false,
+              createdAt: new Date().toISOString(),
+            });
+          }
+        } catch (notifErr) {
+          console.error('Like notification error:', notifErr);
+        }
       }
     } else {
       const likeKey = `${userId}_${clipId}`;
@@ -336,6 +357,31 @@ router.post('/:id/comments', authenticateToken, async (req, res) => {
       success: true,
       comment: { id: commentId, ...commentData },
     });
+
+    // Create comment notification
+    try {
+      const store2 = getClipsDb();
+      if (store2.type === 'firestore') {
+        const clipDoc = await store2.db.collection('clips').doc(clipId).get();
+        const clipData = clipDoc.data();
+        if (clipData && clipData.userId !== req.user.id) {
+          await store2.db.collection('clipNotifications').add({
+            toUserId: clipData.userId,
+            type: 'comment',
+            fromUserId: req.user.id,
+            fromUserName: req.user.name || req.user.email,
+            fromUserPicture: req.user.picture || null,
+            videoId: clipId,
+            videoCaption: clipData.caption || '',
+            commentText: text.trim(),
+            isRead: false,
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
+    } catch (notifErr) {
+      console.error('Comment notification error:', notifErr);
+    }
   } catch (error) {
     console.error('Add comment error:', error);
     res.status(500).json({ error: 'Failed to add comment' });

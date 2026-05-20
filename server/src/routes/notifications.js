@@ -24,18 +24,31 @@ router.get('/', authenticateToken, async (req, res) => {
     let notifications = [];
 
     if (store.type === 'firestore') {
-      const snapshot = await store.db
-        .collection('clipNotifications')
-        .where('toUserId', '==', userId)
-        .orderBy('createdAt', 'desc')
-        .limit(limit)
-        .offset((page - 1) * limit)
-        .get();
+      try {
+        const snapshot = await store.db
+          .collection('clipNotifications')
+          .where('toUserId', '==', userId)
+          .orderBy('createdAt', 'desc')
+          .limit(limit)
+          .offset((page - 1) * limit)
+          .get();
 
-      notifications = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+        notifications = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+      } catch (indexErr) {
+        // Fallback if composite index not yet created
+        const snapshot = await store.db
+          .collection('clipNotifications')
+          .where('toUserId', '==', userId)
+          .get();
+
+        notifications = snapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+          .slice((page - 1) * limit, page * limit);
+      }
     } else {
       const all = [];
       for (const [id, n] of inMemoryStore.clipNotifications) {
