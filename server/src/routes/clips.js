@@ -294,14 +294,25 @@ router.get('/:id/comments', async (req, res) => {
     let comments = [];
 
     if (store.type === 'firestore') {
-      const snapshot = await store.db
-        .collection('clipComments')
-        .where('videoId', '==', clipId)
-        .orderBy('createdAt', 'desc')
-        .offset(offset)
-        .limit(limit)
-        .get();
-      comments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      try {
+        const snapshot = await store.db
+          .collection('clipComments')
+          .where('videoId', '==', clipId)
+          .orderBy('createdAt', 'desc')
+          .offset(offset)
+          .limit(limit)
+          .get();
+        comments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      } catch (indexErr) {
+        const snapshot = await store.db
+          .collection('clipComments')
+          .where('videoId', '==', clipId)
+          .get();
+        comments = snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+          .slice(offset, offset + limit);
+      }
     } else {
       comments = Array.from(inMemoryStore.clipComments.entries())
         .filter(([, data]) => data.videoId === clipId)
