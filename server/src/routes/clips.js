@@ -105,6 +105,15 @@ router.post('/upload', apiLimiter, authenticateToken, upload.single('file'), asy
   }
 });
 
+// Helper: Add stream URL to video objects
+function addStreamUrl(videos, req) {
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  return videos.map(v => ({
+    ...v,
+    streamUrl: `${baseUrl}/api/clips/${v.id}/stream`,
+  }));
+}
+
 // GET /api/clips/feed — Get video feed
 router.get('/feed', async (req, res) => {
   try {
@@ -131,7 +140,7 @@ router.get('/feed', async (req, res) => {
       videos = allClips.slice(offset, offset + limit);
     }
 
-    res.json({ videos, page, limit });
+    res.json({ videos: addStreamUrl(videos, req), page, limit });
   } catch (error) {
     console.error('Feed error:', error);
     res.status(500).json({ error: 'Failed to load feed' });
@@ -159,7 +168,7 @@ router.get('/trending', async (req, res) => {
       videos = allClips.slice(0, limit);
     }
 
-    res.json({ videos });
+    res.json({ videos: addStreamUrl(videos, req) });
   } catch (error) {
     console.error('Trending error:', error);
     res.status(500).json({ error: 'Failed to load trending' });
@@ -187,7 +196,7 @@ router.get('/user/:userId', async (req, res) => {
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }
 
-    res.json({ videos });
+    res.json({ videos: addStreamUrl(videos, req) });
   } catch (error) {
     console.error('User clips error:', error);
     res.status(500).json({ error: 'Failed to load user clips' });
@@ -396,6 +405,94 @@ router.post('/:id/comments', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Add comment error:', error);
     res.status(500).json({ error: 'Failed to add comment' });
+  }
+});
+
+// GET /api/clips/:id/stream — Stream video from Google Drive
+router.get('/:id/stream', async (req, res) => {
+  try {
+    const clipId = req.params.id;
+    const store = getClipsDb();
+    let clipData;
+
+    if (store.type === 'firestore') {
+      const doc = await store.db.collection('clips').doc(clipId).get();
+      if (!doc.exists) return res.status(404).json({ error: 'Clip not found' });
+      clipData = doc.data();
+    } else {
+      clipData = inMemoryStore.clips.get(clipId);
+      if (!clipData) return res.status(404).json({ error: 'Clip not found' });
+    }
+
+    // Get the uploader's OAuth tokens to access their Drive file
+    let userTokens;
+    if (store.type === 'firestore') {
+      const userDoc = await store.db.collection('users').doc(clipData.userId).get();
+      if (!userDoc.exists) return res.status(404).json({ error: 'User not found' });
+      userTokens = userDoc.data();
+    } else {
+      userTokens = inMemoryStore.users.get(clipData.userId);
+      if (!userTokens) return res.status(404).json({ error: 'User not found' });
+    }
+
+    const oauth2Client = createOAuth2Client();
+    oauth2Client.setCredentials({
+      access_token: userTokens.accessToken,
+      refresh_token: userTokens.refreshToken,
+      expiry_date: userTokens.tokenExpiry,
+    });
+
+    const drive = require('googleapis').google.drive({ version: 'v3', auth: oauth2Client });
+
+    const fileMeta = await drive.files.get({
+      fileId: clipData.driveFileId,
+      fields: 'mimeType,size',
+    });
+
+    const range = req.headers.range;
+    const fileSize = parseInt(fileMeta.data.size) || 0;
+    const mimeType = fileMeta.data.mimeType || 'video/mp4';
+
+    if (range && fileSize > 0) {
+      const parts = range.replace(/bytes=/, '').split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+      const chunkSize = end - start + 1;
+
+      const response = await drive.files.get(
+        { fileId: clipData.driveFileId, alt: 'media' },
+        { responseType: 'stream', headers: { Range: `bytes=${start}-${end}` } }
+      );
+
+      res.writeHead(206, {
+        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunkSize,
+        'Content-Type': mimeType,
+        'Cache-Control': 'public, max-age=3600',
+      });
+      response.data.pipe(res);
+    } else {
+      const response = await drive.files.get(
+        { fileId: clipData.driveFileId, alt: 'media' },
+        { responseType: 'stream' }
+      );
+
+      const headers = {
+        'Content-Type': mimeType,
+        'Accept-Ranges': 'bytes',
+        'Cache-Control': 'public, max-age=3600',
+      };
+      if (fileSize > 0) headers['Content-Length'] = fileSize;
+      res.writeHead(200, headers);
+      response.data.pipe(res);
+    }
+  } catch (error) {
+    console.error('Stream error:', error.message);
+    if (error.code === 401 || error.code === 403) {
+      return res.status(401).json({ error: 'Drive authorization expired' });
+    }
+    res.status(500).json({ error: 'Failed to stream video' });
   }
 });
 

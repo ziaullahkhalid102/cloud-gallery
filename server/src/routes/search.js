@@ -45,7 +45,12 @@ router.get('/videos', async (req, res) => {
       }
     }
 
-    res.json({ videos });
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const videosWithStream = videos.map(v => ({
+      ...v,
+      streamUrl: `${baseUrl}/api/clips/${v.id}/stream`,
+    }));
+    res.json({ videos: videosWithStream });
   } catch (error) {
     console.error('Search videos error:', error);
     res.status(500).json({ error: 'Search failed' });
