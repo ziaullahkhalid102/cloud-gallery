@@ -135,7 +135,7 @@ router.get('/google/callback', async (req, res) => {
     const jwtToken = jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
     if (platform === 'mobile') {
-      return res.send(`<!DOCTYPE html><html><head><title>ClipZone Login</title></head><body><script>window.location.href="clipzone://auth?token=${jwtToken}&new=${isNewUser}";</script><p>Login successful! Returning to ClipZone...</p></body></html>`);
+      return res.redirect(`clipzone://auth?token=${jwtToken}&new=${isNewUser}`);
     }
     res.redirect(
       `${process.env.CLIENT_URL}/auth/callback?token=${jwtToken}&new=${isNewUser}`
@@ -143,7 +143,7 @@ router.get('/google/callback', async (req, res) => {
   } catch (error) {
     console.error('OAuth callback error:', error);
     if (platform === 'mobile') {
-      return res.send('<!DOCTYPE html><html><head><title>Login Failed</title></head><body><script>window.location.href="clipzone://auth?error=auth_failed";</script><p>Login failed. Please try again.</p></body></html>');
+      return res.redirect('clipzone://auth?error=auth_failed');
     }
     res.redirect(`${process.env.CLIENT_URL}/login?error=auth_failed`);
   }
